@@ -136,12 +136,6 @@ with st.form(key="my_form"):
     To extract topics, simply set *topics_ngram_range* to (1, 2) or higher depending on the number of words you would like in the resulting topics.""",
         )
 
-    StopWordsCheckbox = st.checkbox(
-        "Remove stop words",
-        value=True,
-        help="Tick this box to remove stop words from the dataset (currently English only)",
-    )
-
     title = st.text_input('Enter a keyword to search for:', '')
 
     ModelType = st.radio(
