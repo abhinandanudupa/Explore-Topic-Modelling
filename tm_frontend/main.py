@@ -8,8 +8,12 @@ from pprint import pprint
 import streamlit as st
 import numpy as np
 from pandas import DataFrame
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+from nltk.stem import WordNetLemmatizer
 
 # For Flair (WordEmbedding)
+from keybert import KeyBERT
 from flair.embeddings import TransformerDocumentEmbeddings
 import seaborn as sns
 
@@ -29,10 +33,10 @@ local_css("styles.css")
 
 with st.sidebar :
     selected = option_menu(
-            menu_title="Topic Modelling",
+            menu_title="STTM",
             menu_icon="chat-square-text-fill",
-            options=["Home", "Datasets", "GSDMM", "BERTopic", "Run GSDMM Yourself", "Run BERTopic Yourself", "References"],
-            icons=["house-fill", "server", "code-square", "code-square", "terminal-fill", "terminal-fill", "file-text-fill"],
+            options=["Home", "Datasets", "GSDMM", "Run GSDMM", "BERTopic", "Run BERTopic", "KeyBERT", "Run KeyBERT", "References"],
+            icons=["house-fill", "server", "code-square", "terminal-fill", "code-square", "terminal-fill", "code-square", "terminal-fill", "file-text-fill"],
             styles={
                 "nav-link-selected" : {"background-color" : "#ffa429", "color" : "black" },
             }
@@ -163,7 +167,7 @@ if selected == "BERTopic" :
     with st.expander("View the Stages", expanded=True):
         st.image("img/bert.png")
 
-if selected == "Run GSDMM Yourself" :
+if selected == "Run GSDMM" :
     st.title(f"Check out GSDMM Yourself! 👨‍💻")
     np.random.seed(493)
 
@@ -212,6 +216,7 @@ if selected == "Run GSDMM Yourself" :
             min_value=0.1,
             max_value=1.0,
             value=0.1,
+            step=0.05,
             help="_______",
         )
         beta = st.slider(
@@ -219,6 +224,7 @@ if selected == "Run GSDMM Yourself" :
             min_value=0.1,
             max_value=1.0,
             value=1.0,
+            step=0.05,
             help="_______",
         )
 
@@ -227,6 +233,7 @@ if selected == "Run GSDMM Yourself" :
             iterations = st.number_input(
                 "Number of Iterations:",
                 value=30,
+                step=5,
                 min_value=20,
                 max_value=80,
                 help="""_______""",
@@ -239,6 +246,7 @@ if selected == "Run GSDMM Yourself" :
                 value=15,
                 min_value=10,
                 max_value=50,
+                step=5,
                 help="""_______""",
             )
         
@@ -291,8 +299,8 @@ if selected == "Run GSDMM Yourself" :
 
 
     def stem(original):
-        ps = nltk.porter.PorterStemmer()
-        stems = [ps.stem(word) for word in original.split()]
+        wnl = WordNetLemmatizer()
+        stems = [wnl.lemmatize(word) for word in original.split()]
         original_stemmed = ' '.join(stems)
         return original_stemmed
 
@@ -313,17 +321,45 @@ if selected == "Run GSDMM Yourself" :
 
     top_index = doc_count.argsort()[-15:][::-1]
 
+    list_of_word_clouds = []
+
+
+    def word_multiply(word, count):
+        s = ""
+        for _ in range(count):
+            s += word + " "
+        return s
+
+    # def top_words(cluster_word_distribution, top_cluster, values):
+    #     for cluster in top_cluster:
+    #         sort_dicts = sorted(mgp.cluster_word_distribution[cluster].items(
+    #         ), key=lambda k: k[1], reverse=True)[:values]
 
     def top_words(cluster_word_distribution, top_cluster, values):
         for cluster in top_cluster:
-            sort_dicts = sorted(mgp.cluster_word_distribution[cluster].items(
-            ), key=lambda k: k[1], reverse=True)[:values]
+            sort_dicts = sorted(
+                mgp.cluster_word_distribution[cluster].items(),
+                key=lambda k: k[1],
+                reverse=True,
+            )[:values]
+            frequencies = {}
+            for i in sort_dicts :
+                frequencies[i[0]] = i[1]
+            if len(frequencies) != 0:
+                wordcloud = WordCloud(
+                    width=800, height=800, background_color="white", min_font_size=10
+                ).generate_from_frequencies(frequencies)
+                list_of_word_clouds.append(wordcloud)
 
-
-    top_words(mgp.cluster_word_distribution, top_index, 7)
+    cols = st.columns(3)
+    top_words(mgp.cluster_word_distribution, top_index, 100)
+    for index, word_cloud in enumerate(list_of_word_clouds):        
+        with cols[index % 3]:            
+            st.image(word_cloud.to_image(), caption=f'Topic #{index}')
 
     topic_dict = {}
-    topic_names = ['Topic #1',
+    topic_names = ['Topic #0',
+                'Topic #1',
                 'Topic #2',
                 'Topic #3',
                 'Topic #4',
@@ -337,7 +373,6 @@ if selected == "Run GSDMM Yourself" :
                 'Topic #12',
                 'Topic #13',
                 'Topic #14',
-                'Topic #15'
                 ]
     for i, topic_num in enumerate(top_index):
         topic_dict[topic_num] = topic_names[i]
@@ -364,10 +399,10 @@ if selected == "Run GSDMM Yourself" :
 
 
     st.header("🎈 Check & Download results")
-    st.table(dfx)
+    st.dataframe(dfx)
 
 
-if selected == "Run BERTopic Yourself" :
+if selected == "Run BERTopic" :
     st.title(f"Check out BERTopic Yourself! 👨‍💻")
     DATASETS = {
         'Trump Tweets': ('trump_tweets.csv', 'text'),
@@ -516,12 +551,6 @@ if selected == "Run BERTopic Yourself" :
 
     coherence_visual = model.visualize_topics()
 
-    # documents_visual = model.visualize_documents(docs)
-
-    # hierarchical_topics = model.hierarchical_topics(docs, topics)
-    # document_hierarchy_visual = model.visualize_hierarchical_documents(
-    #     docs=docs, hierarchical_topics=hierarchical_topics)
-
     topic_hierarchy_visual = model.visualize_hierarchy()
 
     # topic_distribution_visual = model.visualize_distribution(probs)
@@ -531,18 +560,6 @@ if selected == "Run BERTopic Yourself" :
     topic_c_tf_idf_scores_visual = model.visualize_barchart()
 
     term_rank_visual = model.visualize_term_rank()
-
-    # term_rank_visual = model.visualize_term_rank()
-
-    # similar_topics, similarity = model.find_topics("vehicle", num_topics=5)
-
-    # for topic in similar_topics:
-    #   print("-" * 50)
-    #   pprint(model.get_topic(topic))
-    #   print("-" * 50)
-
-
-    # topics_per_class_visual = model.visualize_topics_per_class()
 
     st.markdown("## 🎈 Check & download results ")
 
@@ -555,7 +572,7 @@ if selected == "Run BERTopic Yourself" :
     with tab1:
         st.header("Topics")
         CSVButton = download_button(all_topics, "topics.csv", "📥 Download (.csv)")
-        st.table(all_topics)
+        st.dataframe(all_topics)
 
     with tab2:
         st.header("Coherence")
@@ -576,6 +593,192 @@ if selected == "Run BERTopic Yourself" :
     with tab6:
         st.header("Topic Similarities")
         st.plotly_chart(topic_similarity_visual, use_container_width=True)
+
+if selected == "Run KeyBERT" :
+    def _max_width_():
+        max_width_str = f"max-width: 1400px;"
+        st.markdown(
+            f"""
+        <style>
+        .reportview-container .main .block-container{{
+            {max_width_str}
+        }}
+        </style>    
+        """,
+            unsafe_allow_html=True,
+        )
+
+
+    _max_width_()
+
+    st.title(f"Check out KeyBERT Yourself! 👨‍💻")
+    with st.form(key="my_form"):
+        ModelType = st.radio(
+            "Choose your model",
+            ["DistilBERT (Default)", "Flair"],
+            help="At present, you can choose between 2 models (Flair or DistilBERT) to embed your text. More to come!",
+        )
+
+        if ModelType == "Default (DistilBERT)":
+            # kw_model = KeyBERT(model=roberta)
+
+            @st.cache(allow_output_mutation=True)
+            def load_modell():
+                return KeyBERT(model=roberta)
+
+            kw_model = load_modell()
+
+        else:
+            @st.cache(allow_output_mutation=True)
+            def load_modell():
+                return KeyBERT("distilbert-base-nli-mean-tokens")
+
+            kw_model = load_modell()
+
+        top_N = st.slider(
+            "# of results",
+            min_value=1,
+            max_value=5,
+            value=3,
+            help="You can choose the number of keywords/keyphrases to display. Between 1 and 30, default number is 10.",
+        )
+        min_Ngrams = st.number_input(
+            "Minimum Ngram",
+            min_value=1,
+            max_value=6,
+            help="""The minimum value for the ngram range.
+
+*Keyphrase_ngram_range* sets the length of the resulting keywords/keyphrases.
+
+To extract keyphrases, simply set *keyphrase_ngram_range* to (1, 2) or higher depending on the number of words you would like in the resulting keyphrases.""",
+            # help="Minimum value for the keyphrase_ngram_range. keyphrase_ngram_range sets the length of the resulting keywords/keyphrases. To extract keyphrases, simply set keyphrase_ngram_range to (1, # 2) or higher depending on the number of words you would like in the resulting keyphrases.",
+        )
+
+        max_Ngrams = st.number_input(
+            "Maximum Ngram",
+            value=2,
+            min_value=1,
+            max_value=6,
+            help="""The maximum value for the keyphrase_ngram_range.
+
+*Keyphrase_ngram_range* sets the length of the resulting keywords/keyphrases.
+
+To extract keyphrases, simply set *keyphrase_ngram_range* to (1, 2) or higher depending on the number of words you would like in the resulting keyphrases.""",
+        )
+
+        StopWordsCheckbox = st.checkbox(
+            "Remove stop words",
+            help="Tick this box to remove stop words from the document (currently English only)",
+        )
+
+        use_MMR = st.checkbox(
+            "Use MMR",
+            value=True,
+            help="You can use Maximal Margin Relevance (MMR) to diversify the results. It creates keywords/keyphrases based on cosine similarity. Try high/low 'Diversity' settings below for interesting variations.",
+        )
+
+        Diversity = st.slider(
+            "Keyword diversity (MMR only)",
+            value=0.5,
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
+            help="""The higher the setting, the more diverse the keywords.
+            
+Note that the *Keyword diversity* slider only works if the *MMR* checkbox is ticked.
+
+""",
+        )
+
+        doc = st.text_area(
+            "Paste your text below (max 100 words)",
+            height=200,
+        )
+
+        MAX_WORDS = 100
+        import re
+        res = len(re.findall(r"\w+", doc))
+        if res > MAX_WORDS:
+            st.warning(
+                "⚠️ Your text contains "
+                + str(res)
+                + " words."
+                + " Only the first 500 words will be reviewed. Stay tuned as increased allowance is coming! 😊"
+            )
+
+            doc = doc[:MAX_WORDS]
+
+        submit_button = st.form_submit_button(label="✨ Get me the topic!")
+
+        if use_MMR:
+            mmr = True
+        else:
+            mmr = False
+
+        if StopWordsCheckbox:
+            StopWords = "english"
+        else:
+            StopWords = None
+
+    if not submit_button:
+        st.stop()
+
+    if min_Ngrams > max_Ngrams:
+        st.warning("min_Ngrams can't be greater than max_Ngrams")
+        st.stop()
+
+    keywords = kw_model.extract_keywords(
+        doc,
+        keyphrase_ngram_range=(min_Ngrams, max_Ngrams),
+        use_mmr=mmr,
+        stop_words=StopWords,
+        top_n=top_N,
+        diversity=Diversity,
+    )
+
+    st.markdown("## **🎈 Check & download results **")
+
+    st.header("")
+
+    cs, c1, c2, c3, cLast = st.columns([2, 1.5, 1.5, 1.5, 2])
+
+    with c1:
+        CSVButton2 = download_button(keywords, "Data.csv", "📥 Download (.csv)")
+    with c2:
+        CSVButton2 = download_button(keywords, "Data.txt", "📥 Download (.txt)")
+    with c3:
+        CSVButton2 = download_button(keywords, "Data.json", "📥 Download (.json)")
+
+    st.header("")
+
+    df = (
+        DataFrame(keywords, columns=["Keyword/Keyphrase", "Relevancy"])
+        .sort_values(by="Relevancy", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    df.index += 1
+
+    # Add styling
+    cmGreen = sns.light_palette("green", as_cmap=True)
+    cmRed = sns.light_palette("red", as_cmap=True)
+    df = df.style.background_gradient(
+        cmap=cmGreen,
+        subset=[
+            "Relevancy",
+        ],
+    )
+
+    c1, c2, c3 = st.columns([1, 3, 1])
+
+    format_dictionary = {
+        "Relevancy": "{:.1%}",
+    }
+
+    df = df.format(format_dictionary)
+
+    with c2:
+        st.table(df)
 
 if selected == "References" :
     st.title(f"References 📝")
