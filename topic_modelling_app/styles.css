@@ -1,0 +1,9 @@
+p, label {
+  font-size: 18px;
+  text-align: justify;
+}
+
+.highlight {
+  color: #ffa429;
+  font-weight: 700;
+}
